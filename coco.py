@@ -177,4 +177,79 @@ def rm_noise_coco(json_path,area_thres1,area_thres2=0,visualize = False,image_fo
         json.dump(coco_format, outfile)
     print('In new json:')
     coco_json_read(new_json) 
+    
+  
+def comb(json_):
+    '''
+    Reorder the images and annotations id in the coco in case the discontiguous after some remove operations
+    '''
+    coco_format = get_coco_json_format()
+    coco_format['info'] = json_['info']
+    coco_format['licenses'] = json_['licenses']
+    coco_format['categories'] = json_['categories']
+    annos = json_['annotations']
+    ims = []
+
+    for new_im_id,im in enumerate(json_['images']):
+        new_im = im
+        im_id = im['id']
+        new_im['id'] = new_im_id
+        ims.append(new_im)
+        for anno in annos:
+            if anno['image_id'] == im_id:
+                anno['image_id']  = new_im_id
+
+    for new_anno_id,anno in enumerate(annos):
+        anno['id'] = new_anno_id
+        
+    coco_format['images'] = ims
+    coco_format['annotations'] = annos
+    
+    return coco_format
+
+
+def oversample_coco(json_path,times):
+    '''
+    Oversample the coco json by times
+    '''
+    coco = COCO(json_path)
+    print('In original json:')
+    coco_json_read(coco) 
+
+    json_ = json.load(open(json_path,'r'))
+    coco_format = comb(json_)
+
+    # oversample
+    oversampled_images = []
+    oversampled_annos = []
+    im_id = 0
+    anno_id = 0
+    for time in range(times):
+        for im in coco_format['images']:
+            im_ = copy.deepcopy(im)
+
+            for anno in coco_format['annotations']:
+                if anno['image_id'] == im_['id']:
+                    anno_ = copy.deepcopy(anno)
+                    anno_['image_id']  = im_id
+                    anno_['id']  = anno_id
+                    oversampled_annos.append(anno_)
+                    anno_id += 1
+
+            im_['id'] = im_id
+            oversampled_images.append(im_)
+            im_id += 1
+
+    coco_format['images'] = oversampled_images
+    coco_format['annotations'] = oversampled_annos
+
+    new_json = json_path.split('.')[-2]+'_oversampled.json'
+    with open(new_json,"w") as outfile:
+        json.dump(coco_format, outfile)
+    print('Saved oversampled json file in',new_json)
+    print('In new json:')
+    coco_json_read(new_json) 
+
+
+
 
