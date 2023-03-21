@@ -1,6 +1,9 @@
 from pycocotools.coco import COCO
 import matplotlib.pyplot as plt
 import json
+import copy
+import os
+import cv2
 
 def get_coco_json_format():
     # Standard COCO format 
@@ -60,7 +63,7 @@ def rm_cat_coco(json_path,cat_id):
         raise BaseException('Does not exist this category in json')
     else:
         rm_cat = rm_cat[0]['name']
-    new_json = json_path.split('.')[-2]+'_remove'+rm_cat'.json'
+    new_json = json_path.split('.')[-2]+'_remove'+rm_cat+'.json'
 
     annIds = coco.getAnnIds()
     # coco.getAnnIds(catIds=[])
@@ -249,6 +252,55 @@ def oversample_coco(json_path,times):
     print('Saved oversampled json file in',new_json)
     print('In new json:')
     coco_json_read(new_json) 
+
+
+def combine_coco(base_path,add_path,file_suffix='combined'):
+    '''
+    Combine two coco json into one
+    '''
+    coco_json_read(base_path)
+
+    base_json = json.load(open(base_path,'r'))
+    base_json = comb(base_json)
+
+    combined_json  = get_coco_json_format()
+    combined_json['info'] = base_json['info']
+    combined_json['licenses'] = base_json['licenses']
+    combined_json['categories'] = base_json['categories']
+    imgs = base_json['images']
+    annotations = base_json['annotations']
+
+    # can be combine multiple jsons
+    # for add_json in add_jsons:
+    im_id = imgs[-1]['id'] + 1
+    anno_id = annotations[-1]['id'] + 1
+
+    # append images and annotations of add_dataset to base_dataset
+    coco_json_read(add_path)
+    add_json = json.load(open(add_path,'r'))
+    for add_img in add_json['images']:
+        add_img_ = copy.deepcopy(add_img)
+        for add_anno in add_json['annotations']:
+            if add_anno['image_id'] == add_img_['id']:
+                add_anno_ = copy.deepcopy(add_anno)
+                add_anno_['image_id']  = im_id
+                add_anno_['id']  = anno_id
+                annotations.append(add_anno_)
+                anno_id += 1
+        add_img_['id'] = im_id
+        imgs.append(add_img_)
+        im_id += 1
+
+    combined_json['images'] = imgs
+    combined_json['annotations'] = annotations
+
+    new_json = base_path.split('.')[-2]+'_'+file_suffix+'.json'
+    with open(new_json,"w") as outfile:
+        json.dump(combined_json, outfile)
+    print('Saved oversampled json file in',new_json)
+    print('In new json:')
+    coco_json_read(new_json) 
+
 
 
 
